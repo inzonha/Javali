@@ -158,7 +158,6 @@ BeginSql alias cAliasQry
 	SELECT 'ZZZZZ', COUNT(*) + 1 FROM RG5T10 WHERE RG5_FILIAL = %exp:xFilial('RG5')% AND LEN(RG5_PDPERI) = 3
 	) LIT WHERE FORMAT(ROWNUM, '00#') <> RG5_PDPERI
 EndSql
-DbSelectArea("RCJ")
 
 cNumPerPdr := RTRIM((cAliasQry)->(NOVOPER))
 cNumPerPdr := If(Empty(cNumPerPdr),'001',cNumPerPdr)
@@ -177,7 +176,12 @@ While AnoMes(dPerAux) <= AnoMes(dPerFim)
 	RG6_NUMPAG 	:= '01'
 	RG6_DIAPER 	:= Last_Day(dPerAux)
 	MsUnlock()
-	dPerAux		:= MonthSum(dPerAux,1)                  
+	dPerAux		:= MonthSum(dPerAux,1)          
+	
+	If (Month(dPerIni) == Month(dPerAux) .AND. Year(dPerIni) != Year(dPerAux))
+		Exit 
+	EndIf 
+	        
 EndDo
 
 For nRot := 1 To Len(cRoteiros) Step 3
@@ -194,7 +198,22 @@ For nRot := 1 To Len(cRoteiros) Step 3
 	RGA_MODULO := 'GPE'
 	MsUnlock()
 	
-	GPEA490(cProcesso,cRotAux,'2',.T.)
+	dPerAux		:= dPerIni
+	
+	While Year(dPerAux) <= Year(dPerFim)
+		
+		If Year(dPerAux) != Year(dPerIni)
+			RGA->(dbSetOrder(1))
+			If RGA->(DbSeek(xFilial('RGA')+cProcesso+cRotAux))
+				RecLock("RGA",.F.)
+				RGA_DTINIC := FirstYDate(dPerAux)
+				MsUnlock()
+			EndIf
+		EndIf
+		
+		GPEA490(cProcesso,cRotAux,'2',.T.)
+		dPerAux	:= YearSum(dPerAux,1)
+	EndDo 
 	
 Next nRot                                    
 
