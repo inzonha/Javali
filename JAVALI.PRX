@@ -1,0 +1,442 @@
+#include 'protheus.ch'
+#include 'parmtype.ch'
+
+Main user Function Javali()
+
+Local oBtnOK
+Local oChkFunc
+Local lChkFunc := .T.
+Local oChkPer
+Local lChkPer := .T.
+Local oChkProc
+Local lChkProc := .T.
+Local oGetPerIni
+Local dPerIni := Date()
+Local oGetPerFim
+Local dPerFim := Date()
+Local oGetRot
+Local oGetFilial
+Local oGrpRegime
+Local oRadRegime
+Local oRadSexo
+
+Local oSayFilial
+Local oSayPerFim
+Local oSayPerIni
+Local oSayRot
+Local oSayLog
+Local aItens  	:= {"Competência(MM)","Caixa(MS)"}
+Local nQtdFunc	:= 1  
+
+Static oDlg
+
+private cFilFun := ""
+Private cGetRot := "FOL"
+Private cLog 	:= ""
+
+ 	nRegime	:= 1
+	nSexo 	:= 3
+	DEFINE WINDOW oMainWnd FROM 0,0 TO 500,500 
+	
+	OpenSm0Excl()
+	
+	DbSelectArea("SM0")
+	dbGotop()	
+	
+   	RpcSetType(3)
+	RpcSetEnv(SM0->M0_CODIGO, FwGetCodFilial,,,,,)
+	
+
+
+  DEFINE MSDIALOG oDlg TITLE "JAVALI" FROM 000, 000  TO 400, 255 COLORS 0, 16777215 OF oMainWnd PIXEL
+
+    @ 003, 005 SAY oSayFilial PROMPT "Filial" SIZE 015, 007 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 003, 024 MSGET oGetFilial VAR cFilFun SIZE 098, 010 OF oDlg COLORS 0, 16777215 F3 "SM0" VALID cFilFun := SM0->M0_CODFIL PIXEL
+    @ 013, 005 CHECKBOX oChkProc VAR lChkProc PROMPT "Cadastrar Processo" SIZE 119, 008 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 023, 005 CHECKBOX oChkPer VAR lChkPer PROMPT "Cadastrar Período" SIZE 119, 008 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 035, 014 SAY oSayPerIni PROMPT "Inicio: " SIZE 017, 007 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 033, 034 MSGET oGetPerIni VAR dPerIni SIZE 060, 010 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 045, 014 SAY oSayPerFim PROMPT "Fim:" SIZE 013, 007 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 044, 034 MSGET oGetPerFim VAR dPerFim SIZE 060, 010 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 059, 014 SAY oSayRot PROMPT "Roteiros: " SIZE 025, 007 OF oDlg COLORS 0, 16777215 PIXEL 
+    @ 058, 041 MSGET oGetRot VAR cGetRot SIZE 080, 010 OF oDlg COLORS 0, 16777215 VALID u_fRoteirox() PIXEL
+    @ 069, 005 GROUP oGrpRegime TO 099, 120 PROMPT "Regime" OF oDlg COLOR 0, 16777215 PIXEL
+    @ 078, 010 RADIO oRadRegime VAR nRegime ITEMS "Caixa","Competência" SIZE 104, 018 OF oDlg COLOR 0, 16777215 PIXEL
+        
+    @ 100, 005 CHECKBOX oChkFunc VAR lChkFunc PROMPT "Cadastrar Funcionário" SIZE 114, 008 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 113, 004 GROUP oGrpSexo TO 151, 126 PROMPT "Sexo" OF oDlg COLOR 0, 16777215 PIXEL
+    @ 121, 009 RADIO oRadSexo VAR nSexo ITEMS "Masculino","Feminino","Random" SIZE 110, 027 OF oDlg COLOR 0, 16777215 PIXEL
+    @ 154, 006 SAY oSayQtd PROMPT "Quantidade:" SIZE 035, 007 OF oDlg COLORS 0, 16777215 PIXEL    
+    @ 152, 043 MSGET oGetQtdFun VAR nQtdFunc SIZE 060, 010 OF oDlg PICTURE '999' COLORS 0, 16777215 PIXEL    
+    
+    @ 170, 004 SAY oSayLog VAR cLog SIZE 119, 016 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 187, 004 BUTTON oBtnOK PROMPT "OK" SIZE 120, 012 OF oDlg PIXEL ACTION(U_fMakeMagic(dPerIni, dPerFim, nRegime, nSexo, nQtdFunc))
+    
+    oDlg:lEscClose	:= .F. //Nao permite sair ao se pressionar a tecla ESC.
+
+  ACTIVATE MSDIALOG oDlg CENTERED
+
+Return
+
+static User Function fMakeMagic(dPerIni, dPerFim, nRegime, nSexo, nQtdFunc)
+Local cProcesso := ''
+Local cMat 		:= ''
+Local lOk		:= .T.
+Local nFunc		:= 0
+
+cFilAnt := cFilFun
+cModulo := 'GPE'
+
+CursorWait()
+
+BEGIN TRANSACTION 
+	
+	cProcesso := U_CriaProc('Teste Automator')
+	U_fCriaPer(cProcesso, dPerIni, dPerFim, cGetRot, nRegime)
+	
+	For nFunc := 1 To nQtdFunc
+		lOk := U_fGravaFunc(cProcesso,dPerIni, nSexo, @cMat)
+		
+		If !lOk
+			Break
+		EndIf
+		
+	Next nFunc
+	
+	If lOk
+		cLog := "Processo Cadastrado: " + cProcesso
+		If nQtdFunc == 1 
+			cLog += " - Funcionário: " + cMat
+		Else
+			cLog += " - " + cValToChar(nQtdFunc) + " Funcionários cadastrados"
+		EndIf
+	Else
+		DisarmTransaction()
+		cLog := "Falha na gravação " + cProcesso
+	EndIf
+
+END TRANSACTION 
+
+CursorArrow()
+  
+Return .T.
+
+Static User Function CriaProc(cProcName)
+Local cNumProc := ''
+Local cAliasQry := GetNextAlias()
+
+BeginSql alias cAliasQry
+	SELECT TOP 1  REPLICATE('0',5-LEN(ROWNUM)) + CAST(ROWNUM AS VARCHAR) AS NOVOPROC FROM  (
+	SELECT RCJ_CODIGO, ROW_NUMBER() OVER(ORDER BY RCJ_CODIGO ASC) AS ROWNUM FROM RCJT10
+	WHERE RCJ_FILIAL = %exp:xFilial('RCJ')% ) LIT WHERE ROWNUM <> RCJ_CODIGO
+EndSql
+DbSelectArea("RCJ")
+
+cNumProc := RTRIM((cAliasQry)->(NOVOPROC))
+
+RecLock("RCJ",.T.)
+RCJ_FILIAL := xFilial('RCJ')
+RCJ_ORIGEM := '2'
+RCJ_CODIGO := cNumProc
+RCJ_DESCRI := cProcName
+MsUnlock()
+
+Return cNumProc
+
+Static User Function fCriaPer(cProcesso, dPerIni, dPerFim, cRoteiros, nRegime)
+Local cNumPerPdr 	:= ""
+Local cAliasQry 	:= GetNextAlias()
+Local dPerAux		:= dPerIni
+Local nRot			:= 0
+Local cRotAux		:= ""
+
+BeginSql alias cAliasQry
+	SELECT TOP 1  REPLICATE('0',3-LEN(ROWNUM)) + CAST(ROWNUM AS VARCHAR) AS NOVOPER FROM  (
+	SELECT RG5_PDPERI, ROW_NUMBER() OVER(ORDER BY RG5_PDPERI ASC) AS ROWNUM FROM RG5T10
+	WHERE RG5_FILIAL = %exp:xFilial('RG5')% AND LEN(RG5_PDPERI) = 3	
+	UNION 
+	SELECT 'ZZZZZ', COUNT(*) + 1 FROM RG5T10 WHERE RG5_FILIAL = %exp:xFilial('RG5')% AND LEN(RG5_PDPERI) = 3
+	) LIT WHERE FORMAT(ROWNUM, '00#') <> RG5_PDPERI
+EndSql
+DbSelectArea("RCJ")
+
+cNumPerPdr := RTRIM((cAliasQry)->(NOVOPER))
+cNumPerPdr := If(Empty(cNumPerPdr),'001',cNumPerPdr)
+
+RecLock("RG5",.T.)
+RG5_FILIAL := xFilial('RGA')
+RG5_PDPERI := cNumPerPdr
+RG5_DESCRI := "PROCESSO " + cProcesso
+MsUnlock()
+
+While AnoMes(dPerAux) <= AnoMes(dPerFim)
+	RecLock("RG6",.T.)
+	RG6_FILIAL 	:= xFilial('RG6')
+	RG6_PDPERI 	:= cNumPerPdr
+	RG6_CODIGO 	:= PadL(cValToChar(Month(dPerAux)),2,'0')
+	RG6_NUMPAG 	:= '01'
+	RG6_DIAPER 	:= Last_Day(dPerAux)
+	MsUnlock()
+	dPerAux		:= MonthSum(dPerAux,1)                  
+EndDo
+
+For nRot := 1 To Len(cRoteiros) Step 3
+
+	cRotAux	:= Substr(cRoteiros,nRot,3)
+	
+	RecLock("RGA",.T.)
+	RGA_FILIAL := xFilial('RGA')
+	RGA_PROCES := cProcesso
+	RGA_CALCUL := cRotAux
+	RGA_PDPERI := cNumPerPdr
+	RGA_TOLEPG := If (nRegime == 1, 0, 5)
+	RGA_DTINIC := FirstDate(dPerIni)
+	RGA_MODULO := 'GPE'
+	MsUnlock()
+	
+	GPEA490(cProcesso,cRotAux,'2',.T.)
+	
+Next nRot                                    
+
+Return .T.
+
+User Function fGravaFunc(cProcesso, dPerIni, nSexo, cMatricula)
+Local aCab 			:= {}
+Local cAliasQry 	:= GetNextAlias()
+Local dDataAdm		:= YearSub(dPerIni,1)
+Local cNome			:= ''
+Local cSexo			:= ''
+Local lRet			:= .T.
+
+PrIvate lMsErroAuto	:= .F.
+
+BeginSql alias cAliasQry
+	SELECT TOP 1  REPLICATE('0',6-LEN(ROWNUM)) + CAST(ROWNUM AS VARCHAR) AS NOVAMAT FROM  (
+	SELECT RA_MAT, ROW_NUMBER() OVER(ORDER BY RA_MAT ASC) AS ROWNUM FROM SRAT10
+	WHERE RA_FILIAL = %exp:xFilial('SRA')%) LIT WHERE ROWNUM <> RA_MAT
+EndSql
+
+cMatricula := RTRIM((cAliasQry)->(NOVAMAT))
+
+If nSexo == 1
+	cSexo := 'M'
+ElseIf nSexo == 2
+	cSexo := 'F'
+ElseIf nSexo == 3
+	cSexo := If(Randomize(1,3) == 1, 'M', 'F')
+EndIf
+
+cNome := U_CriaNome(cSexo)
+
+Aadd(aCab, {"RA_MAT", cMatricula,Nil})
+Aadd(aCab, {"RA_NOME", cNome,Nil})
+Aadd(aCab, {"RA_SEXO",cSexo,Nil})
+Aadd(aCab, {"RA_NASC", CTOD("12/02/1989"),Nil})
+Aadd(aCab, {"RA_ESTCIVI", "S",Nil})
+Aadd(aCab, {"RA_NACIONA", "10",Nil})
+Aadd(aCab, {"RA_NATURAL", "SP",Nil})
+Aadd(aCab, {"RA_GRINRAI", "40",Nil})
+//--Campos aba funcionais}
+Aadd(aCab, {"RA_CC","000000002",Nil})
+Aadd(aCab, {"RA_ADMISSA",dDataAdm,Nil})
+Aadd(aCab, {"RA_TIPOADM","9A",Nil})
+Aadd(aCab, {"RA_OPCAO",dDataAdm,Nil})
+Aadd(aCab, {"RA_HRSMES",220.00,Nil})
+Aadd(aCab, {"RA_CODFUNC","00001",Nil})
+Aadd(aCab, {"RA_PROCES",cProcesso,Nil})
+Aadd(aCab, {"RA_TIPOPGT","M",Nil})
+Aadd(aCab, {"RA_CATFUNC","M",Nil})
+Aadd(aCab, {"RA_VIEMRAI","10",Nil})
+Aadd(aCab, {"RA_SALARIO",2200,Nil})
+
+Aadd(aCab, {"RA_NUMCP",'999999',Nil})
+Aadd(aCab, {"RA_SERCP",'99999',Nil})
+Aadd(aCab, {"RA_TNOTRAB",'001',Nil})
+Aadd(aCab, {"RA_CIC",U_GeraCPFVld(),Nil})
+
+MSExecAuto({|x,y,k,w| GPEA010(x,y,k,w)},NIL,NIL,aCab,3) 
+
+If lMsErroAuto	
+	MostraErro()
+	lRet := .F.
+EndIf
+
+Return lRet
+
+
+User Function fRoteirox (l1Elem, lTipoRet, aElem)
+Local cTitulo	:= "Roteiro de Calculo"
+Local nFor		:= 0
+Local nElem		:= 0
+Local MvPar
+Local MvParDef	:=""
+Local MvRetor	:= ""
+Local nX3Tam	:= 0
+Private aSit:={}
+l1Elem := If (l1Elem = Nil , .F. , .T.)
+	
+	DEFAULT lTipoRet 	:= .T. 
+	DEFAULT aElem		:= {}
+	
+	cAlias := Alias() 					// Salva Alias Anterior
+	
+	If lTipoRet
+		MvPar:=&(Alltrim(ReadVar()))	// Carrega Nome da Variavel do Get em Questao
+		mvRet:=Alltrim(ReadVar())		// Iguala Nome da Variavel ao Nome variavel de Retorno
+	EndIf
+
+	dbSelectArea("SRY")
+	If dbSeek(cFilial)
+		CursorWait()
+		While !Eof() .And. SRY->RY_FILIAL == cFilial
+			If AllTrim(Upper(FunName())) == "GPER020"      
+				If SRY->RY_TIPO $ "1/2/3/4/5/6/7/9/F/K/L/M"
+					Aadd(aSit, SRY->RY_CALCULO + " - " + Alltrim(SRY->RY_DESC))
+					MvParDef += SRY->RY_CALCULO  
+				EndIf
+			ElseIf AllTrim(Upper(FunName())) == "GPER670"      
+				If SRY->RY_TIPO $ "1/2/6/9/7/5/F"
+					Aadd(aSit, SRY->RY_CALCULO + " - " + Alltrim(SRY->RY_DESC))
+					MvParDef += SRY->RY_CALCULO  
+				EndIf
+			Else
+				Aadd(aSit, SRY->RY_CALCULO + " - " + Alltrim(SRY->RY_DESC))
+				MvParDef += SRY->RY_CALCULO  
+			EndIf
+			dbSkip()
+		Enddo  
+		If Len(aElem) > 0
+			For nElem := 1 to Len(aElem)	
+				Aadd(aSit, aElem[nElem]) 				//	"EXT - Valores Extras"
+				MvParDef += SubStr(aElem[nElem], 1, 3)	//	MvParDef += "EXT"
+			Next nElem
+		EndIf
+		CursorArrow()
+	EndIf
+	
+	If lTipoRet         
+		nX3Tam := GetSx3Cache("RY_CALCULO","X3_TAMANHO")
+		If f_Opcoes(@MvPar,cTitulo,aSit,MvParDef,,,l1Elem, nX3Tam,Len(aSit))  // Chama funcao f_Opcoes
+			CursorWait()
+			For nFor := 1 To Len( mVpar ) Step 3
+				If ( SubStr( mVpar , nFor , 3 ) # "***" )
+					mvRetor += SubStr( mVpar , nFor , 3 ) 
+				EndIf
+			Next nFor
+		   	
+			If( Empty(mvRetor) )
+				mvRetor := Space(len(mVpar)) 
+			EndIf                       
+			
+			&MvRet 	:= mvRetor
+			CursorArrow()	
+		EndIf	
+	EndIf
+
+	dbSelectArea(cAlias) // Retorna Alias
+
+Return( If( lTipoRet , .T. , MvParDef ) )
+
+User Function CriaNome(cSexo)
+Local aSobreNome := aItem := afirstName := {}
+Local cRealName	:= ""
+Local nPosPers := nPosAdj1 := nPosAdj2 := 0
+
+Default cSexo := 'M'
+
+If cSexo == 'M'
+	afirstName	:= {'Miguel','Arthur','Bernardo','Heitor','Davi','Lorenzo','Théo','Pedro','Gabriel','Enzo','Matheus','Lucas','Benjamin','Nicolas',;
+					'Guilherme','Rafael','Joaquim','Samuel','Enzo Gabriel','João Miguel','Henrique','Gustavo','Murilo','Pedro Henrique','Pietro','Lucca',;
+					'Felipe','João Pedro','Isaac','Benício','Daniel','Anthony','Leonardo','Davi Lucca','Bryan','Eduardo','João Lucas','Victor','João','Cauã',;
+					'Antônio','Vicente','Caleb','Gael','Bento','Caio','Emanuel','Vinícius','João Guilherme','Davi Lucas','Noah','João Gabriel','João Victor',;
+					'Luiz Miguel','Francisco','Kaique','Otávio','Augusto','Levi','Yuri','Enrico','Thiago','Ian','Victor Hugo','Thomas','Henry','Luiz Felipe',;
+					'Ryan','Arthur Miguel','Davi Luiz','Nathan','Pedro Lucas','Davi Miguel','Raul','Pedro Miguel','Luiz Henrique','Luan','Erick','Martin',;
+					'Bruno','Rodrigo','Luiz Gustavo','Arthur Gabriel','Breno','Kauê','Enzo Miguel','Fernando','Arthur Henrique','Luiz Otávio','Carlos Eduardo',;
+					'Tomás','Lucas Gabriel','André','José','Yago','Danilo','Anthony Gabriel','Ruan'}
+					
+Else
+	afirstName	:= {'Alice','Sophia','Helena','Valentina','Laura','Isabella','Manuela','Júlia','Heloísa','Luiza','Maria Luiza',;
+					'Lorena','Lívia','Giovanna','Maria Eduarda','Beatriz','Maria Clara','Cecília','Eloá','Lara','Maria Júlia',;
+					'Isadora','Mariana','Emanuelly','Ana Júlia','Ana Luiza','Ana Clara','Melissa','Yasmin','Maria Alice',;
+					'Isabelly','Lavínia','Esther','Sarah','Elisa','Antonella','Rafaela','Maria Cecília','Liz','Marina','Nicole',;
+					'Maitê','Isis','Alícia','Luna','Rebeca','Agatha','Letícia','Maria','Gabriela','Ana Laura','Catarina','Clara',;
+					'Ana Beatriz','Vitória','Olívia','Maria Fernanda','Emilly','Maria Valentina','Milena','Maria Helena','Bianca',;
+					'Larissa','Mirella','Maria Flor','Allana','Ana Sophia','Clarice','Pietra','Maria Vitória','Maya','Laís','Ayla',;
+					'Ana Lívia','Eduarda','Mariah','Stella','Ana','Gabrielly','Sophie','Carolina','Maria Laura','Maria Heloísa',;
+					'Maria Sophia','Fernanda','Malu','Analu','Amanda','Aurora','Maria Isis','Louise','Heloise','Ana Vitória',;
+					'Ana Cecília','Ana Liz','Joana','Luana','Antônia'} 
+EndIf
+
+aSobreNome 	:= {'Alves','Monteiro','Novaes','Mendes','Barros','Freitas','Barbosa','Pinto','Moura','Cavalcanti','Dias','Castro',;
+				'Campos','Cardoso','Silva','Souza','Costa','Santos','Oliveira','Pereira','Rodrigues','Almeida','Nascimento',;
+				'Lima','Araújo','Fernandes','Carvalho','Gomes','Martins','Rocha','Ribeiro','Rezende','Sales','Peixoto','Fogaça',;
+				'Porto','Ribeiro','Duarte','Moraes','Ramos','Pereira','Ferreira','Silveira','Moreira','Teixeira','Caldeira',;
+				'Vieira','Nogueira','da Costa','da Rocha','da Cruz','da Cunha','da Mata','da Rosa','da Mota','da Paz','da Luz',;
+				'da Conceição','das Neves','Fernandes','Gonçalves','Rodrigues','Martins','Lopes','Gomes','Mendes','Nunes',;
+				'Carvalho','Melo','Cardoso,','Pires','Jesus','Aragão','Viana','Farias','Bispo'}
+
+nPosPers := Randomize(1,LEN(afirstName)+1)
+nPosAdj2 := nPosAdj1 := Randomize(1,LEN(aSobreNome)+1)
+
+While nPosAdj1 == nPosAdj2
+	nPosAdj2 := Randomize(1,LEN(aSobreNome)+1)
+EndDo
+
+cRealName := afirstName[nPosPers] + " " + aSobreNome[nPosAdj1] + " " + aSobreNome[nPosAdj2]
+
+Return cRealName
+
+User Function GeraCPFVld()
+Local aCpf1		:= Array(9,3)
+Local aCpf2 	:= Array(10,3)
+Local cCpf		:= ""
+Local nX 		:= 0
+Local nAux		:= 11
+Local nTotAux	:= 0
+Local nDig1 	:= 0
+Local nDig2 	:= 0
+
+For nX :=1 to 9
+	aCpf1[nX,1] := Randomize(0,10) 
+	aCpf1[nX,2] := nAux - nX
+	aCpf1[nX,3] := aCpf1[nX,2] * aCpf1[nX,1]
+	nTotAux += aCpf1[nX,3]   
+Next nX
+
+nDig1 := nTotAux % 11
+
+If nDig1 < 2
+	nDig1 := 0
+Else
+	nDig1 := 11 - nDig1
+EndIf
+
+nTotAux := 0
+
+For nX := 1 to 9
+	aCpf2[nX,1] := aCpf1[nX,1]
+	aCpf2[nX,2] := aCpf1[nX,2]+1
+	aCpf2[nX,3] := aCpf2[nX,2] * aCpf2[nX,1]
+	nTotAux += aCpf2[nX,3] 
+Next nX
+
+aCpf2[10,1] := nDig1
+aCpf2[10,2] := 2
+aCpf2[10,3] := aCpf2[10,2] * aCpf2[10,1]
+nTotAux += aCpf2[10,3]
+
+nDig2 := nTotAux % 11
+
+If nDig2 < 2
+	nDig2 := 0
+Else
+	nDig2 := 11 - nDig2
+EndIf
+
+For nX := 1 to 9
+	cCpf += AllTrim(Str(aCpf1[nX,1]))
+Next nX
+
+cCpf += AllTrim(Str(nDig1)) + AllTrim(Str(nDig2))
+
+Return cCpf
