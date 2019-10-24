@@ -5,7 +5,6 @@ Main user Function Javali()
 
 Local oBtnOK
 Local oChkFunc
-Local lChkFunc := .T.
 Local oChkPer
 Local lChkPer := .T.
 Local oChkProc
@@ -25,14 +24,15 @@ Local oSayPerFim
 Local oSayPerIni
 Local oSayRot
 Local oSayLog
-Local aItens  	:= {"CompetÍncia(MM)","Caixa(MS)"}
+Local aItens  	:= {"Compet√™ncia(MM)","Caixa(MS)"}
 Local nQtdFunc	:= 1  
 
 Static oDlg
 
-private cFilFun := ""
+Private cFilFun := ""
 Private cGetRot := "FOL"
 Private cLog 	:= ""
+Private lChkFunc:= .T.
 
  	nRegime	:= 1
 	nSexo 	:= 3
@@ -53,7 +53,7 @@ Private cLog 	:= ""
     @ 003, 005 SAY oSayFilial PROMPT "Filial" SIZE 015, 007 OF oDlg COLORS 0, 16777215 PIXEL
     @ 003, 024 MSGET oGetFilial VAR cFilFun SIZE 098, 010 OF oDlg COLORS 0, 16777215 F3 "SM0" VALID cFilFun := SM0->M0_CODFIL PIXEL
     @ 013, 005 CHECKBOX oChkProc VAR lChkProc PROMPT "Cadastrar Processo" SIZE 119, 008 OF oDlg COLORS 0, 16777215 PIXEL
-    @ 023, 005 CHECKBOX oChkPer VAR lChkPer PROMPT "Cadastrar PerÌodo" SIZE 119, 008 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 023, 005 CHECKBOX oChkPer VAR lChkPer PROMPT "Cadastrar Per√≠odo" SIZE 119, 008 OF oDlg COLORS 0, 16777215 PIXEL
     @ 035, 014 SAY oSayPerIni PROMPT "Inicio: " SIZE 017, 007 OF oDlg COLORS 0, 16777215 PIXEL
     @ 033, 034 MSGET oGetPerIni VAR dPerIni SIZE 060, 010 OF oDlg COLORS 0, 16777215 PIXEL
     @ 045, 014 SAY oSayPerFim PROMPT "Fim:" SIZE 013, 007 OF oDlg COLORS 0, 16777215 PIXEL
@@ -61,9 +61,9 @@ Private cLog 	:= ""
     @ 059, 014 SAY oSayRot PROMPT "Roteiros: " SIZE 025, 007 OF oDlg COLORS 0, 16777215 PIXEL 
     @ 058, 041 MSGET oGetRot VAR cGetRot SIZE 080, 010 OF oDlg COLORS 0, 16777215 VALID u_fRoteirox() PIXEL
     @ 069, 005 GROUP oGrpRegime TO 099, 120 PROMPT "Regime" OF oDlg COLOR 0, 16777215 PIXEL
-    @ 078, 010 RADIO oRadRegime VAR nRegime ITEMS "Caixa","CompetÍncia" SIZE 104, 018 OF oDlg COLOR 0, 16777215 PIXEL
+    @ 078, 010 RADIO oRadRegime VAR nRegime ITEMS "Caixa","Compet√™ncia" SIZE 104, 018 OF oDlg COLOR 0, 16777215 PIXEL
         
-    @ 100, 005 CHECKBOX oChkFunc VAR lChkFunc PROMPT "Cadastrar Funcion·rio" SIZE 114, 008 OF oDlg COLORS 0, 16777215 PIXEL
+    @ 100, 005 CHECKBOX oChkFunc VAR lChkFunc PROMPT "Cadastrar Funcion√°rio" SIZE 114, 008 OF oDlg COLORS 0, 16777215 PIXEL
     @ 113, 004 GROUP oGrpSexo TO 151, 126 PROMPT "Sexo" OF oDlg COLOR 0, 16777215 PIXEL
     @ 121, 009 RADIO oRadSexo VAR nSexo ITEMS "Masculino","Feminino","Random" SIZE 110, 027 OF oDlg COLOR 0, 16777215 PIXEL
     @ 154, 006 SAY oSayQtd PROMPT "Quantidade:" SIZE 035, 007 OF oDlg COLORS 0, 16777215 PIXEL    
@@ -94,25 +94,27 @@ BEGIN TRANSACTION
 	cProcesso := U_CriaProc('Teste Automator')
 	U_fCriaPer(cProcesso, dPerIni, dPerFim, cGetRot, nRegime)
 	
-	For nFunc := 1 To nQtdFunc
-		lOk := U_fGravaFunc(cProcesso,dPerIni, nSexo, @cMat)
-		
-		If !lOk
-			Break
-		EndIf
-		
-	Next nFunc
+	If lChkFunc
+		For nFunc := 1 To nQtdFunc
+			lOk := U_fGravaFunc(cProcesso,dPerIni, nSexo, @cMat)
+
+			If !lOk
+				Break
+			EndIf
+
+		Next nFunc
+	EndIf
 	
 	If lOk
 		cLog := "Processo Cadastrado: " + cProcesso
 		If nQtdFunc == 1 
-			cLog += " - Funcion·rio: " + cMat
+			cLog += " - Funcion√°rio: " + cMat
 		Else
-			cLog += " - " + cValToChar(nQtdFunc) + " Funcion·rios cadastrados"
+			cLog += " - " + cValToChar(nQtdFunc) + " Funcion√°rios cadastrados"
 		EndIf
 	Else
 		DisarmTransaction()
-		cLog := "Falha na gravaÁ„o " + cProcesso
+		cLog := "Falha na grava√ß√£o " + cProcesso
 	EndIf
 
 END TRANSACTION 
@@ -127,8 +129,8 @@ Local cAliasQry := GetNextAlias()
 
 BeginSql alias cAliasQry
 	SELECT TOP 1  REPLICATE('0',5-LEN(ROWNUM)) + CAST(ROWNUM AS VARCHAR) AS NOVOPROC FROM  (
-	SELECT RCJ_CODIGO, ROW_NUMBER() OVER(ORDER BY RCJ_CODIGO ASC) AS ROWNUM FROM RCJT10
-	WHERE RCJ_FILIAL = %exp:xFilial('RCJ')% ) LIT WHERE ROWNUM <> RCJ_CODIGO
+	SELECT RCJ_CODIGO, ROW_NUMBER() OVER(ORDER BY RCJ_CODIGO ASC) AS ROWNUM FROM RCJT10 RCJ
+	WHERE RCJ_FILIAL = %exp:xFilial('RCJ')%  AND RCJ.%NotDel% ) LIT WHERE ROWNUM <> RCJ_CODIGO
 EndSql
 DbSelectArea("RCJ")
 
@@ -152,10 +154,10 @@ Local cRotAux		:= ""
 
 BeginSql alias cAliasQry
 	SELECT TOP 1  REPLICATE('0',3-LEN(ROWNUM)) + CAST(ROWNUM AS VARCHAR) AS NOVOPER FROM  (
-	SELECT RG5_PDPERI, ROW_NUMBER() OVER(ORDER BY RG5_PDPERI ASC) AS ROWNUM FROM RG5T10
-	WHERE RG5_FILIAL = %exp:xFilial('RG5')% AND LEN(RG5_PDPERI) = 3	
+	SELECT RG5_PDPERI, ROW_NUMBER() OVER(ORDER BY RG5_PDPERI ASC) AS ROWNUM FROM RG5T10 RG5
+	WHERE RG5_FILIAL = %exp:xFilial('RG5')% AND LEN(RG5_PDPERI) = 3	AND RG5.%NotDel%
 	UNION 
-	SELECT 'ZZZZZ', COUNT(*) + 1 FROM RG5T10 WHERE RG5_FILIAL = %exp:xFilial('RG5')% AND LEN(RG5_PDPERI) = 3
+	SELECT 'ZZZZZ', COUNT(*) + 1 FROM RG5T10 RG51 WHERE RG5_FILIAL = %exp:xFilial('RG5')% AND LEN(RG5_PDPERI) = 3 AND RG51.%NotDel%
 	) LIT WHERE FORMAT(ROWNUM, '00#') <> RG5_PDPERI
 EndSql
 
@@ -231,8 +233,8 @@ PrIvate lMsErroAuto	:= .F.
 
 BeginSql alias cAliasQry
 	SELECT TOP 1  REPLICATE('0',6-LEN(ROWNUM)) + CAST(ROWNUM AS VARCHAR) AS NOVAMAT FROM  (
-	SELECT RA_MAT, ROW_NUMBER() OVER(ORDER BY RA_MAT ASC) AS ROWNUM FROM SRAT10
-	WHERE RA_FILIAL = %exp:xFilial('SRA')%) LIT WHERE ROWNUM <> RA_MAT
+	SELECT RA_MAT, ROW_NUMBER() OVER(ORDER BY RA_MAT ASC) AS ROWNUM FROM SRAT10 SRA
+	WHERE RA_FILIAL = %exp:xFilial('SRA')% AND SRA.%NotDel%) LIT WHERE ROWNUM <> RA_MAT
 EndSql
 
 cMatricula := RTRIM((cAliasQry)->(NOVAMAT))
@@ -364,35 +366,35 @@ Local nPosPers := nPosAdj1 := nPosAdj2 := 0
 Default cSexo := 'M'
 
 If cSexo == 'M'
-	afirstName	:= {'Miguel','Arthur','Bernardo','Heitor','Davi','Lorenzo','ThÈo','Pedro','Gabriel','Enzo','Matheus','Lucas','Benjamin','Nicolas',;
-					'Guilherme','Rafael','Joaquim','Samuel','Enzo Gabriel','Jo„o Miguel','Henrique','Gustavo','Murilo','Pedro Henrique','Pietro','Lucca',;
-					'Felipe','Jo„o Pedro','Isaac','BenÌcio','Daniel','Anthony','Leonardo','Davi Lucca','Bryan','Eduardo','Jo„o Lucas','Victor','Jo„o','Cau„',;
-					'AntÙnio','Vicente','Caleb','Gael','Bento','Caio','Emanuel','VinÌcius','Jo„o Guilherme','Davi Lucas','Noah','Jo„o Gabriel','Jo„o Victor',;
-					'Luiz Miguel','Francisco','Kaique','Ot·vio','Augusto','Levi','Yuri','Enrico','Thiago','Ian','Victor Hugo','Thomas','Henry','Luiz Felipe',;
+	afirstName	:= {'Miguel','Arthur','Bernardo','Heitor','Davi','Lorenzo','Th√©o','Pedro','Gabriel','Enzo','Matheus','Lucas','Benjamin','Nicolas',;
+					'Guilherme','Rafael','Joaquim','Samuel','Enzo Gabriel','Jo√£o Miguel','Henrique','Gustavo','Murilo','Pedro Henrique','Pietro','Lucca',;
+					'Felipe','Jo√£o Pedro','Isaac','Ben√≠cio','Daniel','Anthony','Leonardo','Davi Lucca','Bryan','Eduardo','Jo√£o Lucas','Victor','Jo√£o','Cau√£',;
+					'Ant√¥nio','Vicente','Caleb','Gael','Bento','Caio','Emanuel','Vin√≠cius','Jo√£o Guilherme','Davi Lucas','Noah','Jo√£o Gabriel','Jo√£o Victor',;
+					'Luiz Miguel','Francisco','Kaique','Ot√°vio','Augusto','Levi','Yuri','Enrico','Thiago','Ian','Victor Hugo','Thomas','Henry','Luiz Felipe',;
 					'Ryan','Arthur Miguel','Davi Luiz','Nathan','Pedro Lucas','Davi Miguel','Raul','Pedro Miguel','Luiz Henrique','Luan','Erick','Martin',;
-					'Bruno','Rodrigo','Luiz Gustavo','Arthur Gabriel','Breno','KauÍ','Enzo Miguel','Fernando','Arthur Henrique','Luiz Ot·vio','Carlos Eduardo',;
-					'Tom·s','Lucas Gabriel','AndrÈ','JosÈ','Yago','Danilo','Anthony Gabriel','Ruan'}
+					'Bruno','Rodrigo','Luiz Gustavo','Arthur Gabriel','Breno','Kau√™','Enzo Miguel','Fernando','Arthur Henrique','Luiz Ot√°vio','Carlos Eduardo',;
+					'Tom√°s','Lucas Gabriel','Andr√©','Jos√©','Yago','Danilo','Anthony Gabriel','Ruan'}
 					
 Else
-	afirstName	:= {'Alice','Sophia','Helena','Valentina','Laura','Isabella','Manuela','J˙lia','HeloÌsa','Luiza','Maria Luiza',;
-					'Lorena','LÌvia','Giovanna','Maria Eduarda','Beatriz','Maria Clara','CecÌlia','Elo·','Lara','Maria J˙lia',;
-					'Isadora','Mariana','Emanuelly','Ana J˙lia','Ana Luiza','Ana Clara','Melissa','Yasmin','Maria Alice',;
-					'Isabelly','LavÌnia','Esther','Sarah','Elisa','Antonella','Rafaela','Maria CecÌlia','Liz','Marina','Nicole',;
-					'MaitÍ','Isis','AlÌcia','Luna','Rebeca','Agatha','LetÌcia','Maria','Gabriela','Ana Laura','Catarina','Clara',;
-					'Ana Beatriz','VitÛria','OlÌvia','Maria Fernanda','Emilly','Maria Valentina','Milena','Maria Helena','Bianca',;
-					'Larissa','Mirella','Maria Flor','Allana','Ana Sophia','Clarice','Pietra','Maria VitÛria','Maya','LaÌs','Ayla',;
-					'Ana LÌvia','Eduarda','Mariah','Stella','Ana','Gabrielly','Sophie','Carolina','Maria Laura','Maria HeloÌsa',;
-					'Maria Sophia','Fernanda','Malu','Analu','Amanda','Aurora','Maria Isis','Louise','Heloise','Ana VitÛria',;
-					'Ana CecÌlia','Ana Liz','Joana','Luana','AntÙnia'} 
+	afirstName	:= {'Alice','Sophia','Helena','Valentina','Laura','Isabella','Manuela','J√∫lia','Helo√≠sa','Luiza','Maria Luiza',;
+					'Lorena','L√≠via','Giovanna','Maria Eduarda','Beatriz','Maria Clara','Cec√≠lia','Elo√°','Lara','Maria J√∫lia',;
+					'Isadora','Mariana','Emanuelly','Ana J√∫lia','Ana Luiza','Ana Clara','Melissa','Yasmin','Maria Alice',;
+					'Isabelly','Lav√≠nia','Esther','Sarah','Elisa','Antonella','Rafaela','Maria Cec√≠lia','Liz','Marina','Nicole',;
+					'Mait√™','Isis','Al√≠cia','Luna','Rebeca','Agatha','Let√≠cia','Maria','Gabriela','Ana Laura','Catarina','Clara',;
+					'Ana Beatriz','Vit√≥ria','Ol√≠via','Maria Fernanda','Emilly','Maria Valentina','Milena','Maria Helena','Bianca',;
+					'Larissa','Mirella','Maria Flor','Allana','Ana Sophia','Clarice','Pietra','Maria Vit√≥ria','Maya','La√≠s','Ayla',;
+					'Ana L√≠via','Eduarda','Mariah','Stella','Ana','Gabrielly','Sophie','Carolina','Maria Laura','Maria Helo√≠sa',;
+					'Maria Sophia','Fernanda','Malu','Analu','Amanda','Aurora','Maria Isis','Louise','Heloise','Ana Vit√≥ria',;
+					'Ana Cec√≠lia','Ana Liz','Joana','Luana','Ant√¥nia'} 
 EndIf
 
 aSobreNome 	:= {'Alves','Monteiro','Novaes','Mendes','Barros','Freitas','Barbosa','Pinto','Moura','Cavalcanti','Dias','Castro',;
 				'Campos','Cardoso','Silva','Souza','Costa','Santos','Oliveira','Pereira','Rodrigues','Almeida','Nascimento',;
-				'Lima','Ara˙jo','Fernandes','Carvalho','Gomes','Martins','Rocha','Ribeiro','Rezende','Sales','Peixoto','FogaÁa',;
+				'Lima','Ara√∫jo','Fernandes','Carvalho','Gomes','Martins','Rocha','Ribeiro','Rezende','Sales','Peixoto','Foga√ßa',;
 				'Porto','Ribeiro','Duarte','Moraes','Ramos','Pereira','Ferreira','Silveira','Moreira','Teixeira','Caldeira',;
 				'Vieira','Nogueira','da Costa','da Rocha','da Cruz','da Cunha','da Mata','da Rosa','da Mota','da Paz','da Luz',;
-				'da ConceiÁ„o','das Neves','Fernandes','GonÁalves','Rodrigues','Martins','Lopes','Gomes','Mendes','Nunes',;
-				'Carvalho','Melo','Cardoso,','Pires','Jesus','Arag„o','Viana','Farias','Bispo'}
+				'da Concei√ß√£o','das Neves','Fernandes','Gon√ßalves','Rodrigues','Martins','Lopes','Gomes','Mendes','Nunes',;
+				'Carvalho','Melo','Cardoso,','Pires','Jesus','Arag√£o','Viana','Farias','Bispo'}
 
 nPosPers := Randomize(1,LEN(afirstName)+1)
 nPosAdj2 := nPosAdj1 := Randomize(1,LEN(aSobreNome)+1)
